@@ -15,7 +15,16 @@ use crate::hand::PokerHand;
 
 fn main() {
     let mut deck = Deck::new();
-    deck.remove_ranks(&Rank::Two);
+    deck.remove_suits(&Suit::Spades);
+    deck.remove_suits(&Suit::Clubs);
+    deck.remove_suits(&Suit::Hearts);
+    deck.remove_suits(&Suit::Diamonds);
+    for _ in 0..10 {
+        deck.add_card(Card {
+            suit: Suit::Wild,
+            rank: Rank::Ace,
+        });
+    }
 
     let mut results = HashMap::new();
 
@@ -25,7 +34,7 @@ fn main() {
         .parse::<u64>()
         .unwrap_or(10000);
     for _ in 0..trials {
-        let mut hand = deck.draw_hand(8);
+        let mut hand = deck.draw_hand(10);
         let result: HashMap<PokerHand, u32> = hand.evaluate_poker_hands();
         for (&k, &v) in result.iter() {
             let cnt = results.entry(k).or_insert(0) ;

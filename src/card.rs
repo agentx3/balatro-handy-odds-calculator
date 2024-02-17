@@ -86,47 +86,6 @@ impl Rank {
             Rank::NONE=>Rank::NONE,
         }
     }
-    // pub fn from_int(i: u8) -> Result<Rank, &'static str> {
-    //     match i {
-    //         2 => Ok(Rank::Two),
-    //         3 => Ok(Rank::Three),
-    //         4 => Ok(Rank::Four),
-    //         5 => Ok(Rank::Five),
-    //         6 => Ok(Rank::Six),
-    //         7 => Ok(Rank::Seven),
-    //         8 => Ok(Rank::Eight),
-    //         9 => Ok(Rank::Nine),
-    //         10 => Ok(Rank::Ten),
-    //         11 => Ok(Rank::Jack),
-    //         12 => Ok(Rank::Queen),
-    //         13 => Ok(Rank::King),
-    //         14 => Ok(Rank::Ace),
-    //         _ => Err("Invalid rank"),
-    //     }
-    // }
-
-    // pub fn to_int(&self) -> u8 {
-    //     *self as u8
-    // }
-
-    // pub fn str_to_int(s: &str) -> Result<u8, &'static str> {
-    //     match s {
-    //         "Two" => Ok(2),
-    //         "Three" => Ok(3),
-    //         "Four" => Ok(4),
-    //         "Five" => Ok(5),
-    //         "Six" => Ok(6),
-    //         "Seven" => Ok(7),
-    //         "Eight" => Ok(8),
-    //         "Nine" => Ok(9),
-    //         "Ten" => Ok(10),
-    //         "J" => Ok(11),
-    //         "Q" => Ok(12),
-    //         "K" => Ok(13),
-    //         "A" => Ok(14),
-    //         _ => Err("Invalid rank"), 
-    //     }
-    // }
 
     pub fn to_str(&self) -> &'static str {
         match self {
