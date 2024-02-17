@@ -1,4 +1,3 @@
-#![feature(stmt_expr_attributes)]
 mod card;
 mod deck;
 mod hand;

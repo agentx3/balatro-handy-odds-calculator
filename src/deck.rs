@@ -1,4 +1,5 @@
 use rand::seq::SliceRandom;
+use wasm_bindgen::convert::WasmAbi;
 
 use crate::card::{Card, Rank, Suit};
 use crate::hand::Hand;
@@ -14,6 +15,9 @@ impl From<Vec<Card>> for Deck {
         Deck { cards }
     }
 }
+
+
+
 
 impl Deck {
     pub fn new() -> Self {
