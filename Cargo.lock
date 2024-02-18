@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "common_macros",
  "getrandom",
+ "js-sys",
  "rand",
  "wasm-bindgen",
 ]

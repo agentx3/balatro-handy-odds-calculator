@@ -6,6 +6,7 @@ mod utils;
 mod card;
 
 #[wasm_bindgen]
-pub fn new_deck() {
-    println!("Creating a new deck");
+pub fn new_deck()-> JsValue {
+    let deck =deck::Deck::new();
+    deck.to_jsvalue()
 }

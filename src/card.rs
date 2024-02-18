@@ -1,6 +1,10 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
+use js_sys::Object;
+use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::*;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Suit {
     NONE = 0,
@@ -11,7 +15,7 @@ pub enum Suit {
     Wild,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Rank {
     NONE = 0,
     Two = 2,
@@ -27,6 +31,19 @@ pub enum Rank {
     Queen,
     King,
     Ace,
+}
+
+impl Suit {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Suit::NONE => "NONE",
+            Suit::Clubs => "Clubs",
+            Suit::Diamonds => "Diamonds",
+            Suit::Hearts => "Hearts",
+            Suit::Spades => "Spades",
+            Suit::Wild => "Wild",
+        }
+    }
 }
 
 impl Rank {
@@ -49,41 +66,41 @@ impl Rank {
         }
     }
 
-    pub fn next(&self)->Rank{
-        match self{
-            Rank::Two=>Rank::Three,
-            Rank::Three=>Rank::Four,
-            Rank::Four=>Rank::Five,
-            Rank::Five=>Rank::Six,
-            Rank::Six=>Rank::Seven,
-            Rank::Seven=>Rank::Eight,
-            Rank::Eight=>Rank::Nine,
-            Rank::Nine=>Rank::Ten,
-            Rank::Ten=>Rank::Jack,
-            Rank::Jack=>Rank::Queen,
-            Rank::Queen=>Rank::King,
-            Rank::King=>Rank::Ace,
-            Rank::Ace=>Rank::Two,
-            Rank::NONE=>Rank::NONE,
+    pub fn next(&self) -> Rank {
+        match self {
+            Rank::Two => Rank::Three,
+            Rank::Three => Rank::Four,
+            Rank::Four => Rank::Five,
+            Rank::Five => Rank::Six,
+            Rank::Six => Rank::Seven,
+            Rank::Seven => Rank::Eight,
+            Rank::Eight => Rank::Nine,
+            Rank::Nine => Rank::Ten,
+            Rank::Ten => Rank::Jack,
+            Rank::Jack => Rank::Queen,
+            Rank::Queen => Rank::King,
+            Rank::King => Rank::Ace,
+            Rank::Ace => Rank::Two,
+            Rank::NONE => Rank::NONE,
         }
     }
 
-    pub fn prev(&self)->Rank{
-        match self{
-            Rank::Two=>Rank::Ace,
-            Rank::Three=>Rank::Two,
-            Rank::Four=>Rank::Three,
-            Rank::Five=>Rank::Four,
-            Rank::Six=>Rank::Five,
-            Rank::Seven=>Rank::Six,
-            Rank::Eight=>Rank::Seven,
-            Rank::Nine=>Rank::Eight,
-            Rank::Ten=>Rank::Nine,
-            Rank::Jack=>Rank::Ten,
-            Rank::Queen=>Rank::Jack,
-            Rank::King=>Rank::Queen,
-            Rank::Ace=>Rank::King,
-            Rank::NONE=>Rank::NONE,
+    pub fn prev(&self) -> Rank {
+        match self {
+            Rank::Two => Rank::Ace,
+            Rank::Three => Rank::Two,
+            Rank::Four => Rank::Three,
+            Rank::Five => Rank::Four,
+            Rank::Six => Rank::Five,
+            Rank::Seven => Rank::Six,
+            Rank::Eight => Rank::Seven,
+            Rank::Nine => Rank::Eight,
+            Rank::Ten => Rank::Nine,
+            Rank::Jack => Rank::Ten,
+            Rank::Queen => Rank::Jack,
+            Rank::King => Rank::Queen,
+            Rank::Ace => Rank::King,
+            Rank::NONE => Rank::NONE,
         }
     }
 
@@ -145,17 +162,36 @@ pub struct Card {
 }
 
 impl Card {
-    pub fn next(&self)->Card{
-        Card{
-            rank:self.rank.next(),
-            suit:self.suit,
+    pub fn next(&self) -> Card {
+        Card {
+            rank: self.rank.next(),
+            suit: self.suit,
         }
     }
-    pub fn prev(&self)->Card{
-        Card{
-            rank:self.rank.prev(),
-            suit:self.suit,
+    pub fn prev(&self) -> Card {
+        Card {
+            rank: self.rank.prev(),
+            suit: self.suit,
         }
+    }
+
+    pub fn to_str(&self) -> String {
+        format!("{} of {}", self.rank.to_str(), self.suit.to_str())
+    }
+
+    pub fn to_jsvalue(&self) -> JsValue {
+        let obj = Object::new();
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("rank"),
+            &JsValue::from_str(self.rank.to_str()),
+        );
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str("suit"),
+            &JsValue::from_str(self.suit.to_str()),
+        );
+        JsValue::from(obj)
     }
 }
 

@@ -1,9 +1,10 @@
 use rand::seq::SliceRandom;
-use wasm_bindgen::convert::WasmAbi;
+use wasm_bindgen::JsValue;
 
 use crate::card::{Card, Rank, Suit};
 use crate::hand::Hand;
 use crate::utils::statistics::generate_random_numbers;
+use js_sys::Object;
 
 #[derive(Debug, Clone)]
 pub struct Deck {
@@ -15,9 +16,6 @@ impl From<Vec<Card>> for Deck {
         Deck { cards }
     }
 }
-
-
-
 
 impl Deck {
     pub fn new() -> Self {
@@ -32,6 +30,19 @@ impl Deck {
         }
         Deck { cards }
     }
+
+    pub fn to_jsvalue(&self) -> JsValue {
+        let obj = Object::new();
+        let arr = js_sys::Array::new();
+        for card in &self.cards {
+
+        }
+
+        JsValue::from(obj)
+
+
+    }
+
 
     // Add a card to the deck, allowing duplicates
     pub fn add_card(&mut self, card: Card) {
