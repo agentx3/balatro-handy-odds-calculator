@@ -33,16 +33,65 @@ impl Deck {
 
     pub fn to_jsvalue(&self) -> JsValue {
         let obj = Object::new();
-        let arr = js_sys::Array::new();
+        let array = js_sys::Array::new();
         for card in &self.cards {
-
+            array.push(&card.to_jsvalue());
+        }
+        unsafe {
+            let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("cards"), &JsValue::from(array));
         }
 
         JsValue::from(obj)
+    }
 
+    pub fn from_jsvalue(jsvalue: JsValue) -> Result<Self, String> {
+        // Expect { cards: {{rank: int, suit: str}[]} }
+        let obj = js_sys::Object::from(jsvalue);
+        let cards = match js_sys::Reflect::get(&obj, &JsValue::from_str("cards")) {
+            Ok(cards) => cards,
+            Err(_) => return Err("Invalid deck object".to_string()),
+        };
+        if !js_sys::Array::is_array(&cards) {
+            return Err("Invalid deck object".to_string());
+        }
+        let cards_arr = js_sys::Array::from(&cards);
+        let mut cards_vec = Vec::new();
+
+        for i in 0..cards_arr.length() {
+            let suit = match js_sys::Reflect::get(&cards_arr.get(i), &JsValue::from_str("suit")) {
+                Ok(suit) => match suit.as_string() {
+                    Some(suit) => suit,
+                    None => return Err("Invalid card object".to_string()),
+                },
+                Err(_) => return Err("Invalid card object".to_string()),
+            };
+            let rank = match js_sys::Reflect::get(&cards_arr.get(i), &JsValue::from_str("rank")) {
+                Ok(rank) => match rank.as_f64() {
+                    Some(rank) => rank,
+                    None => return Err("Invalid card object".to_string()),
+                },
+                Err(_) => return Err("Invalid card object".to_string()),
+            };
+            cards_vec.push(Card {
+                rank: Rank::from_int(rank as usize),
+                suit: Suit::from_str(suit.as_str()),
+            });
+        }
+        Ok(Deck::from(cards_vec))
 
     }
 
+    pub fn reset(&mut self) {
+        self.cards.clear();
+        for suit in &[Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
+            for rank in 2..=14 {
+                self.cards.push(Card {
+                    suit: *suit,
+                    rank: Rank::from(rank), // Implement From trait for conversion
+                });
+            }
+        }
+    }
 
     // Add a card to the deck, allowing duplicates
     pub fn add_card(&mut self, card: Card) {

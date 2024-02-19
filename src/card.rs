@@ -2,8 +2,8 @@ use core::fmt;
 use std::fmt::{Display, Formatter};
 
 use js_sys::Object;
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Suit {
@@ -44,9 +44,36 @@ impl Suit {
             Suit::Wild => "Wild",
         }
     }
+
+    pub fn from_str(s: &str) -> Suit {
+        match s {
+            "Clubs" => Suit::Clubs,
+            "Diamonds" => Suit::Diamonds,
+            "Hearts" => Suit::Hearts,
+            "Spades" => Suit::Spades,
+            "Wild" => Suit::Wild,
+            _ => Suit::NONE,
+        }
+    }
+
+    pub fn from_jsvalue(jsvalue: JsValue) -> Result<Suit, &'static str> {
+        let suit = match jsvalue.as_string() {
+            Some(suit) => suit,
+            None => return Err("Invalid suit object"),
+        };
+        Ok(Suit::from_str(&suit))
+    }
 }
 
 impl Rank {
+    pub fn from_jsvalue(jsvalue: JsValue) -> Result<Rank, &'static str> {
+        let rank = match jsvalue.as_f64() {
+            Some(rank) => rank as usize,
+            None => return Err("Invalid rank object"),
+        };
+        Ok(Rank::from(rank))
+    }
+
     pub fn from_str(s: &str) -> Result<Rank, &'static str> {
         match s {
             "Two" => Ok(Rank::Two),
@@ -123,6 +150,45 @@ impl Rank {
         }
     }
 
+    pub fn to_int(&self) -> usize {
+        match self {
+            Rank::Two => 2,
+            Rank::Three => 3,
+            Rank::Four => 4,
+            Rank::Five => 5,
+            Rank::Six => 6,
+            Rank::Seven => 7,
+            Rank::Eight => 8,
+            Rank::Nine => 9,
+            Rank::Ten => 10,
+            Rank::Jack => 11,
+            Rank::Queen => 12,
+            Rank::King => 13,
+            Rank::Ace => 14,
+            Rank::NONE => 0,
+        }
+    }
+
+    pub fn from_int(i: usize) -> Rank {
+        match i {
+            1 => Rank::Ace,
+            2 => Rank::Two,
+            3 => Rank::Three,
+            4 => Rank::Four,
+            5 => Rank::Five,
+            6 => Rank::Six,
+            7 => Rank::Seven,
+            8 => Rank::Eight,
+            9 => Rank::Nine,
+            10 => Rank::Ten,
+            11 => Rank::Jack,
+            12 => Rank::Queen,
+            13 => Rank::King,
+            14 => Rank::Ace,
+            _ => Rank::NONE,
+        }
+    }
+
     // pub fn all_ranks() -> Vec<Rank> {
     //     vec![
     //         Rank::Two,
@@ -181,12 +247,12 @@ impl Card {
 
     pub fn to_jsvalue(&self) -> JsValue {
         let obj = Object::new();
-        js_sys::Reflect::set(
+        let _ = js_sys::Reflect::set(
             &obj,
             &JsValue::from_str("rank"),
-            &JsValue::from_str(self.rank.to_str()),
+            &JsValue::from_f64(self.rank.to_int() as f64),
         );
-        js_sys::Reflect::set(
+        let _ = js_sys::Reflect::set(
             &obj,
             &JsValue::from_str("suit"),
             &JsValue::from_str(self.suit.to_str()),
