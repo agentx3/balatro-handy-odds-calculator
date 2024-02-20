@@ -57,7 +57,6 @@ impl Hand {
     // Check all hands in one pass (or minimal passes) for performance
     pub fn evaluate_poker_hands(&mut self) -> HashMap<PokerHand, u32> {
         let mut rank_map = HashMap::new();
-
         let mut hand_map = HashMap::new();
 
         // Variables to help full house and flush house
@@ -149,6 +148,13 @@ impl Hand {
         self.cards
             .sort_by(|a, b| a.rank.cmp(&b.rank).then(a.suit.cmp(&b.suit)));
 
+        // Used to help finding flush house and full house
+        let mut last_non_wild_suit: Suit = NONE;
+        let mut flush_threes: HashMap<Suit, boolean> = HashMap::new();
+        let mut flush_pairs: HashMap<Suit, boolean> = HashMap::new();
+        let mut have_non_flush_threes = false;
+        let mut have_non_flush_pairs = false;
+
         for (i, card) in self.cards.iter().enumerate() {
             let rank_count = rank_map.entry(card.rank).or_insert(0);
             *rank_count += 1;
@@ -156,6 +162,9 @@ impl Hand {
             if card.suit == last_suit || (card.suit == Wild && last_suit != NONE) {
                 suit_streak += 1;
             } else {
+                if card.suit != Wild {
+                    last_non_wild_suit = card.suit;
+                }
                 suit_streak = 1;
             }
 
@@ -173,21 +182,24 @@ impl Hand {
                             hand_map.insert(PokerHand::Pair, 1);
                         }
                     }
-                    full_house_potential_pairs.push(self.cards[i - 1..=i].to_vec());
-                    // TODO: This doesn't account for wilds, move to the upper loop
-                    if suit_streak == 2 {
+
+                    // Does this account for wilds?
+                    if suit_streak >= 2 {
                         flush_house_potential_pairs.push(self.cards[i - 1..=i].to_vec());
+                    } else {
+                        full_house_potential_pairs.push(self.cards[i - 1..=i].to_vec());
                     }
                 }
                 3 => {
                     hand_map.insert(PokerHand::ThreeOfAKind, 1);
                     // If we have a triple here, that means we previously had a pair
-                    full_house_potential_threes.push(self.cards[i - 2..=i].to_vec());
-                    full_house_potential_pairs.pop();
                     // TODO: This doesn't account for wilds, move to the upper loop
-                    if suit_streak == 3 {
+                    if suit_streak >= 3 {
                         flush_house_potential_threes.push(self.cards[i - 2..=i].to_vec());
                         flush_house_potential_pairs.pop();
+                    } else {
+                        full_house_potential_threes.push(self.cards[i - 2..=i].to_vec());
+                        full_house_potential_pairs.pop();
                     }
                 }
                 4 => {
@@ -283,28 +295,60 @@ impl Hand {
 
             last_suit = card.suit;
         }
-        // Check for full house
+        // Check for flush house and full house in flush-house potentials
+        // This part is probably the least efficient part of the code
+        // Because each triplet or pair might consist of a standard suit and wilds
+        // And we don't know whether the hand is bound to a suit or fully wild
+        'outer: for pts in flush_house_potential_threes.iter() {
+            let mut full_wild_triplet = true;
+            let mut suit_triplet: Suit = NONE;
+            for card in pts.iter() {
+                if card.suit != Wild {
+                    suit_triplet = card.suit;
+                }
+            }
+            // If we have a full wild triplet, we have a flush house
+            // Because it doesn't matter what the other two cards are
+            if full_wild_triplet {
+                hand_map.insert(PokerHand::FlushHouse, 1);
+
+                // If we have full house we dont' have to continue checking
+                if hand_map.contains_key(&PokerHand::FullHouse) {
+                    break 'outer;
+                }
+            }
+
+            for pps in flush_house_potential_pairs.iter() {
+                let mut full_wild_pair = true;
+                let mut suit_pair: Suit = NONE;
+                for card in pps.iter() {
+                    if card.suit == Wild {
+                        // Do nothing
+                    } else if card.suit == suit_triplet {
+                        // Matching suit
+                        hand_map.insert(PokerHand::FlushHouse, 1);
+                    } else {
+                        // We at least have a regular full house
+                        hand_map.insert(PokerHand::FullHouse, 1);
+                    }
+                }
+            }
+        }
+        println!(
+            "potentials threes: {:#?}, \npotentials pairs: {:#?}",
+            flush_house_potential_threes, flush_house_potential_pairs
+        );
+
+        // Check for full house in all 4 sets of potentials X_houses
+        // If we have 2 different 3 pairs, or 1 3 pair and 1 2 pair
+        // of different suits, we have a full house
         if full_house_potential_threes.len() > 1
             || (full_house_potential_threes.len() > 0 && full_house_potential_pairs.len() > 0)
         {
             hand_map.insert(PokerHand::FullHouse, 1);
         }
-        // Check for flush house
-        'outer: for i in 0..flush_house_potential_threes.len() {
-            for j in 0..flush_house_potential_pairs.len() {
-                if flush_house_potential_threes[i][0].rank == flush_house_potential_pairs[j][0].rank
-                {
-                    hand_map.insert(PokerHand::FlushHouse, 1);
-                    break 'outer;
-                }
-            }
-        }
-        // if hand_map.contains_key(&PokerHand::StraightFlush) {
-        //     println!("$$StraightFlush$$ in hand {:#?}", self.cards);
-        // }
-        // if hand_map.contains_key(&PokerHand::Flush) {
-        //     println!("$$Flush$$ in hand {:#?}", hand_with_subbed_wilds.cards);
-        // }
+        println!("Full house potentials: {:#?}", full_house_potential_threes);
+        println!("Full house potentials: {:#?}", full_house_potential_pairs);
         hand_map
     }
 }
@@ -444,6 +488,47 @@ mod tests {
 
         let expected: HashMap<PokerHand, u32> = hash_map! {
             PokerHand::Straight => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+    #[test]
+    fn it_evaluates_5_wild_flush_five() {
+        let cards: Vec<Card>;
+
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Two  , suit: Wild    },
+            ];
+        }
+
+        let expected: HashMap<PokerHand, u32> = hash_map! {
+            PokerHand::FlushFive => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+    #[test]
+    fn it_evalutes_flush_house() {
+        let cards: Vec<Card>;
+
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Two  , suit: Wild    },
+                Card { rank: Rank::Three  , suit: Clubs    },
+                Card { rank: Rank::Three  , suit: Wild    },
+                Card { rank: Rank::Three  , suit: Wild    },
+                Card { rank: Rank::Ace  , suit: Clubs    },
+            ];
+        }
+
+        let expected: HashMap<PokerHand, u32> = hash_map! {
+            PokerHand::FlushHouse => 1,
         };
         test_hand_correctness(cards, &expected);
     }
