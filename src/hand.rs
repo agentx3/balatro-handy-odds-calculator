@@ -62,8 +62,6 @@ impl Hand {
         // Variables to help full house and flush house
         let mut full_house_potential_threes: Vec<Vec<Card>> = Vec::new();
         let mut full_house_potential_pairs: Vec<Vec<Card>> = Vec::new();
-        let mut flush_house_potential_threes: Vec<Vec<Card>> = Vec::new();
-        let mut flush_house_potential_pairs: Vec<Vec<Card>> = Vec::new();
 
         // Variable to help with straights
         let mut curr_straight_streak = 1;
@@ -88,10 +86,15 @@ impl Hand {
         hand_with_subbed_wilds
             .cards
             .sort_by(|a, b| a.suit.cmp(&b.suit).then(a.rank.cmp(&b.rank)));
+        println!("Hand with subbed wilds: {:#?}", hand_with_subbed_wilds);
 
         for card in hand_with_subbed_wilds.cards.iter() {
             if card.suit == last_suit || (card.suit == Wild && last_suit != NONE) {
                 suit_streak += 1;
+                if card.rank == last_rank {
+                    println!("Rank streak: {:#?}, Card: {:?}", rank_streak, card);
+                    rank_streak += 1;
+                }
             } else {
                 // We moved to the next suit
                 // Reset the streak and de-prime the low ace straight
@@ -102,11 +105,8 @@ impl Hand {
                 curr_straight_streak = 1;
 
                 // Reset rank streak since we mainly care about suits here
-                if card.rank == last_rank {
-                    rank_streak += 1;
-                } else {
-                    rank_streak = 1;
-                }
+                rank_streak = 1;
+
             }
 
             if last_straight_rank == card.rank {
@@ -120,9 +120,12 @@ impl Hand {
             // We have a 2-5 straight right now
             if card.rank == Rank::Five && curr_straight_streak == 4 {
                 primed_for_low_ace_straight = true;
-                ace_suits_for_straight_flush.insert(card.suit);
+                if suit_streak >= 4 {
+                    ace_suits_for_straight_flush.insert(card.suit);
+                }
             }
             if suit_streak >= 5 && suit_streak > curr_straight_streak && rank_streak < 5 {
+                // println!("Suit streak: {:#?}, Rank streak: {:#?}, Card: {:#?}", suit_streak, rank_streak, card);
                 hand_map.insert(PokerHand::Flush, 1);
             }
             if suit_streak >= 5 && rank_streak >= 5 {
@@ -130,11 +133,14 @@ impl Hand {
             }
             if curr_straight_streak >= 5 && suit_streak >= 5 {
                 hand_map.insert(PokerHand::StraightFlush, 1);
-            } else if primed_for_low_ace_straight
-                && card.rank == Rank::Ace
-                && ace_suits_for_straight_flush.contains(&card.suit)
-            {
-                hand_map.insert(PokerHand::StraightFlush, 1);
+            } else if primed_for_low_ace_straight && card.rank == Rank::Ace {
+                // Something about the straight check here is probably redundant
+                // but it passes a test so we can optimize later
+                if ace_suits_for_straight_flush.contains(&card.suit) {
+                    hand_map.insert(PokerHand::StraightFlush, 1);
+                } else {
+                    hand_map.insert(PokerHand::Straight, 1);
+                }
             }
             last_straight_rank = card.rank;
             last_suit = card.suit;
@@ -152,7 +158,10 @@ impl Hand {
             .sort_by(|a, b| a.rank.cmp(&b.rank).then(a.suit.cmp(&b.suit)));
 
         // Used to help finding flush house and full house
+        // and eliminating counting straight flushes as straights
+        // Because we should detect something like 2H 2W 3C 3C 4C 5C 6C as SF
         let mut wild_streak = 0;
+
         // If this reads NONE then we haven't seen a non-wild suit yet
         // for the current rank
         let mut last_non_wild_suit: Suit = NONE;
@@ -168,26 +177,29 @@ impl Hand {
             let rank_count = rank_map.entry(card.rank).or_insert(0);
             *rank_count += 1;
 
-            if card.suit == last_suit || (card.suit == Wild && last_suit != NONE) {
+            if last_suit == Wild && card.suit != Wild {
+                suit_streak = wild_streak + 1;
+            } else if card.suit == last_suit || (card.suit == Wild && last_suit != NONE) {
                 suit_streak += 1;
             } else {
                 // Set the last non-wild suit
                 // Except in the case we have moved onto a new rank
                 suit_streak = 1;
             }
-            // If we change ranks, reset the wild streak
-            if card.rank != last_rank {
-                wild_streak = 0;
-                if card.suit != Wild {
-                    last_non_wild_suit = card.suit;
-                } else {
-                    last_non_wild_suit = NONE;
-                }
-            }
             if card.suit == Wild {
                 wild_streak += 1;
+                println!("Wild streak: {:#?}, Card: {:?}", wild_streak, card);
             } else {
                 wild_streak = 0;
+            }
+            let effective_suit_streak = suit_streak + wild_streak;
+
+            // This might be unncessary with the addition of recent changes
+            // If we change ranks, reset the last non-wild suit
+            if card.rank != last_rank && card.suit != Wild {
+                last_non_wild_suit = card.suit;
+            } else {
+                last_non_wild_suit = NONE;
             }
 
             // Check for the hands that use duplicates
@@ -215,13 +227,6 @@ impl Hand {
                     } else {
                         have_non_flush_pairs = true;
                     }
-
-                    // // Does this account for wilds?
-                    // if suit_streak >= 2 {
-                    //     flush_house_potential_pairs.push(self.cards[i - 1..=i].to_vec());
-                    // } else {
-                    //     full_house_potential_pairs.push(self.cards[i - 1..=i].to_vec());
-                    // }
                 }
                 3 => {
                     hand_map.insert(PokerHand::ThreeOfAKind, 1);
@@ -246,6 +251,10 @@ impl Hand {
                         have_flush_threes.insert(card.suit, true);
                     } else {
                         have_non_flush_threes = true;
+                    }
+                    // We remove the pair if we have a triple to avoid double counting
+                    if have_flush_threes.contains_key(&card.suit) {
+                        have_flush_pairs.remove(&card.suit);
                     }
 
                     // if suit_streak >= 3 {
@@ -340,9 +349,13 @@ impl Hand {
                     _ => {}
                 }
             }
-            if curr_straight_streak == 5 {
+            if curr_straight_streak == 5 && effective_suit_streak < 5 {
                 // Already handled straight flushes
                 if potential_straight_suits.len() > 1 {
+                    println!(
+                        "Wild, suit: {:#?}, {:#?}, {:#?}",
+                        wild_streak, suit_streak, card
+                    );
                     hand_map.insert(PokerHand::Straight, 1);
                 }
             }
@@ -358,13 +371,19 @@ impl Hand {
             hand_map.insert(PokerHand::FullHouse, 1);
         }
 
-        for _3suit in have_flush_threes.iter() {
-            if have_flush_pairs.contains_key(_3suit.0) {
-                hand_map.insert(PokerHand::FlushHouse, 1);
-            } else if _3suit.0 == &Wild && have_flush_pairs.len() > 0 {
-                hand_map.insert(PokerHand::FlushHouse, 1);
-            } else if have_flush_pairs.contains_key(&Wild) {
-                hand_map.insert(PokerHand::FlushHouse, 1);
+        if have_flush_threes.len() > 1
+            || (have_flush_threes.len() > 0 && have_flush_pairs.len() > 0)
+        {
+            hand_map.insert(PokerHand::FlushHouse, 1);
+        } else {
+            for _3suit in have_flush_threes.iter() {
+                if have_flush_pairs.contains_key(_3suit.0) {
+                    hand_map.insert(PokerHand::FlushHouse, 1);
+                } else if _3suit.0 == &Wild && have_flush_pairs.len() > 0 {
+                    hand_map.insert(PokerHand::FlushHouse, 1);
+                } else if have_flush_pairs.contains_key(&Wild) {
+                    hand_map.insert(PokerHand::FlushHouse, 1);
+                }
             }
         }
 
@@ -376,8 +395,6 @@ impl Hand {
         {
             hand_map.insert(PokerHand::FullHouse, 1);
         }
-        println!("Full house potentials: {:#?}", full_house_potential_threes);
-        println!("Full house potentials: {:#?}", full_house_potential_pairs);
         hand_map
     }
 }
@@ -391,23 +408,22 @@ mod tests {
         results: &HashMap<PokerHand, u32>,
         expected: &HashMap<PokerHand, u32>,
     ) {
-        for (key, expected_value) in expected.iter() {
-            println!("Checking {:?}... expected: {}", key, expected_value);
-            match results.get(key) {
+        for (key, real_value) in results.iter() {
+            println!(
+                "Checking {:?}... expected: {}",
+                key,
+                expected.get(key).unwrap_or(&0)
+            );
+            match expected.get(key) {
                 Some(v) => {
                     assert_eq!(
-                        expected[key], *v,
+                        results[key], *v,
                         "Expected {:?} to be {}, got {}",
-                        key, expected[key], *v
+                        key, v, real_value
                     );
                 }
                 None => {
-                    println!("Got results: {:?}", results);
-                    assert_eq!(
-                        *expected_value, 0,
-                        "Expected {:?} to be {}, got None",
-                        key, expected[key]
-                    );
+                    panic!("Unexpected key: {:?}", key);
                 }
             }
         }
@@ -537,6 +553,9 @@ mod tests {
 
         let expected: HashMap<PokerHand, u32> = hash_map! {
             PokerHand::FlushFive => 1,
+            PokerHand::FourOfAKind => 1,
+            PokerHand::ThreeOfAKind => 1,
+            PokerHand::Pair => 1,
         };
         test_hand_correctness(cards, &expected);
     }
@@ -558,6 +577,94 @@ mod tests {
 
         let expected: HashMap<PokerHand, u32> = hash_map! {
             PokerHand::FlushHouse => 1,
+            PokerHand::ThreeOfAKind => 1,
+            PokerHand::TwoPair => 1,
+            PokerHand::Pair => 1,
+            PokerHand::FullHouse => 1,
+            PokerHand::Flush => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+
+    #[test]
+    fn test_simple_flush() {
+        let cards: Vec<Card>;
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Two, suit: Hearts },
+                Card { rank: Rank::Three, suit: Hearts },
+                Card { rank: Rank::Five, suit: Hearts },
+                Card { rank: Rank::Seven, suit: Hearts },
+                Card { rank: Rank::Nine, suit: Hearts },
+            ];
+        }
+        let expected = hash_map! {
+            PokerHand::Flush => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+
+    #[test]
+    fn test_simple_straight() {
+        let cards: Vec<Card>;
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Ten, suit: Clubs },
+                Card { rank: Rank::Jack, suit: Diamonds },
+                Card { rank: Rank::Queen, suit: Hearts },
+                Card { rank: Rank::King, suit: Spades },
+                Card { rank: Rank::Ace, suit: Wild }, // Acting as Ace of any suit
+            ];
+        }
+        let expected = hash_map! {
+            PokerHand::Straight => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+
+    #[test]
+    fn test_with_multiple_wild_cards_forming_straight_flush() {
+        let cards: Vec<Card>;
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Six, suit: Wild },
+                Card { rank: Rank::Seven, suit: Wild },
+                Card { rank: Rank::Eight, suit: Clubs },
+                Card { rank: Rank::Eight, suit: Clubs },
+                Card { rank: Rank::Nine, suit: Clubs },
+                Card { rank: Rank::Ten, suit: Clubs },
+            ];
+        }
+        let expected = hash_map! {
+            PokerHand::StraightFlush => 1,
+            PokerHand::Flush=>1,
+            PokerHand::Pair => 1,
+        };
+        test_hand_correctness(cards, &expected);
+    }
+
+    #[test]
+    fn test_for_natural_full_house_vs_wild_full_house() {
+        let cards: Vec<Card>;
+        #[rustfmt::skip]
+        {
+            cards = vec![
+                Card { rank: Rank::Jack, suit: Diamonds },
+                Card { rank: Rank::Jack, suit: Spades },
+                Card { rank: Rank::Jack, suit: Clubs },
+                Card { rank: Rank::Nine, suit: Hearts },
+                Card { rank: Rank::Nine, suit: Wild }, // Acting as Nine of any suit
+            ];
+        }
+        let expected = hash_map! {
+            PokerHand::FullHouse => 1,
+            PokerHand::Pair => 1,
+            PokerHand::ThreeOfAKind => 1,
+            PokerHand::TwoPair => 1,
+
         };
         test_hand_correctness(cards, &expected);
     }

@@ -25,38 +25,25 @@ extern "C" {
 pub fn parse_deck(deck: JsValue) -> JsValue {
     let deck = deck::Deck::from_jsvalue(deck);
     match deck {
-        Ok(deck) => deck.to_jsvalue(),
+        Ok(deck) => {
+            let mut _deck = DECK.lock().unwrap();
+            *_deck = deck;
+            drop(_deck);
+            JsValue::from_f64(0f64)
+        }
         Err(e) => {
             error(&e);
-            JsValue::NULL
+            JsValue::from_f64(1f64)
         }
     }
 }
+
 #[wasm_bindgen]
 pub fn new_deck() -> JsValue {
     let deck = deck::Deck::new();
     deck.to_jsvalue()
 }
 
-// pub fn add_card(suit: JsValue, rank: JsValue) -> Result<(), JsValue> {
-//     let suit = card::Suit::from_jsvalue(suit);
-//     let rank = card::Rank::from_jsvalue(rank);
-//     match (suit, rank) {
-//         (Ok(suit), Ok(rank)) => {
-//             match DECK.lock() {
-//                 Ok(mut d) => {
-//                     d.add_card(card::Card { suit, rank });
-//                 }
-//                 Err(e) => {
-//                     error(&format!("Failed to lock deck: {}", e));
-//                     return Err(JsValue::from_str("Failed to lock deck"));
-//                 }
-//             }
-//             Ok(())
-//         }
-//         _ => Err(JsValue::from_str("Invalid suit or rank")),
-//     }
-// }
 #[wasm_bindgen]
 pub fn add_card(suit: String, rank: i32) -> Result<(), JsValue> {
     match DECK.lock() {
@@ -121,7 +108,6 @@ pub struct PokerHandResults {
     results: Vec<PokerHandResult>,
 }
 
-
 #[wasm_bindgen]
 pub fn draw_trial(hand_size: u8, trials: u32) -> JsValue {
     let deck = match DECK.lock() {
@@ -142,5 +128,9 @@ pub fn draw_trial(hand_size: u8, trials: u32) -> JsValue {
             *count += v;
         }
     }
+    let net_result: HashMap<PokerHand, f64> = net_result
+        .iter()
+        .map(|(k, v)| (*k, *v as f64 / trials as f64))
+        .collect();
     serde_wasm_bindgen::to_value(&net_result).unwrap()
 }
