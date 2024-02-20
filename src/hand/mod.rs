@@ -3,10 +3,12 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     card::Suit::{self, Clubs, Diamonds, Hearts, Spades, Wild, NONE},
     card::{Card, Rank},
-    deck::Deck,
 };
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
+use serde::{Serialize, Deserialize};
+
+#[cfg(test)]
+mod test;
 
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -24,6 +26,8 @@ pub enum PokerHand {
     FiveOfAKind,
     FlushFive,
 }
+
+
 
 #[derive(Debug, Clone)]
 pub struct Hand {
@@ -58,10 +62,6 @@ impl Hand {
     pub fn evaluate_poker_hands(&mut self) -> HashMap<PokerHand, u32> {
         let mut rank_map = HashMap::new();
         let mut hand_map = HashMap::new();
-
-        // Variables to help full house and flush house
-        let mut full_house_potential_threes: Vec<Vec<Card>> = Vec::new();
-        let mut full_house_potential_pairs: Vec<Vec<Card>> = Vec::new();
 
         // Variable to help with straights
         let mut curr_straight_streak = 1;
@@ -164,7 +164,7 @@ impl Hand {
 
         // If this reads NONE then we haven't seen a non-wild suit yet
         // for the current rank
-        let mut last_non_wild_suit: Suit = NONE;
+        let mut last_non_wild_suit: Suit;
         let mut have_flush_threes: HashMap<Suit, bool> = HashMap::new();
         let mut have_flush_pairs: HashMap<Suit, bool> = HashMap::new();
         let mut have_non_flush_threes = false;
@@ -173,7 +173,7 @@ impl Hand {
         // is included by the non_flush_three
         let mut have_non_flush_pairs_2 = false;
 
-        for (i, card) in self.cards.iter().enumerate() {
+        for card in self.cards.iter() {
             let rank_count = rank_map.entry(card.rank).or_insert(0);
             *rank_count += 1;
 
@@ -257,13 +257,6 @@ impl Hand {
                         have_flush_pairs.remove(&card.suit);
                     }
 
-                    // if suit_streak >= 3 {
-                    //     flush_house_potential_threes.push(self.cards[i - 2..=i].to_vec());
-                    //     flush_house_potential_pairs.pop();
-                    // } else {
-                    //     full_house_potential_threes.push(self.cards[i - 2..=i].to_vec());
-                    //     full_house_potential_pairs.pop();
-                    // }
                 }
                 4 => {
                     hand_map.insert(PokerHand::FourOfAKind, 1);
@@ -387,285 +380,7 @@ impl Hand {
             }
         }
 
-        // Check for full house in all 4 sets of potentials X_houses
-        // If we have 2 different 3 pairs, or 1 3 pair and 1 2 pair
-        // of different suits, we have a full house
-        if full_house_potential_threes.len() > 1
-            || (full_house_potential_threes.len() > 0 && full_house_potential_pairs.len() > 0)
-        {
-            hand_map.insert(PokerHand::FullHouse, 1);
-        }
         hand_map
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use common_macros::hash_map;
-
-    fn assert_expected_results(
-        results: &HashMap<PokerHand, u32>,
-        expected: &HashMap<PokerHand, u32>,
-    ) {
-        for (key, real_value) in results.iter() {
-            println!(
-                "Checking {:?}... expected: {}",
-                key,
-                expected.get(key).unwrap_or(&0)
-            );
-            match expected.get(key) {
-                Some(v) => {
-                    assert_eq!(
-                        results[key], *v,
-                        "Expected {:?} to be {}, got {}",
-                        key, v, real_value
-                    );
-                }
-                None => {
-                    panic!("Unexpected key: {:?}", key);
-                }
-            }
-        }
-    }
-
-    fn test_hand_correctness(cards: Vec<Card>, expected: &HashMap<PokerHand, u32>) {
-        let mut hand = Hand::from(cards);
-        let results = hand.evaluate_poker_hands();
-        assert_expected_results(&results, &expected);
-    }
-    #[test]
-    fn it_evaluates_hand_correctly_1() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Clubs    },
-                Card { rank: Rank::Five , suit: Clubs    },
-                Card { rank: Rank::Three, suit: Clubs    },
-                Card { rank: Rank::Four , suit: Wild     },
-                Card { rank: Rank::Eight, suit: Diamonds },
-                Card { rank: Rank::Eight, suit: Diamonds },
-                Card { rank: Rank::Eight, suit: Clubs    },
-                Card { rank: Rank::Ace  , suit: Wild     },
-                Card { rank: Rank::Ace  , suit: Diamonds },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::Pair => 1,
-            PokerHand::TwoPair => 1,
-            PokerHand::ThreeOfAKind => 1,
-            PokerHand::Flush => 1,
-            PokerHand::Straight => 1,
-            PokerHand::FullHouse => 1,
-            PokerHand::StraightFlush => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-
-    #[test]
-    fn it_evaluates_hand_correctly_2() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Clubs    },
-                Card { rank: Rank::Five , suit: Clubs    },
-                Card { rank: Rank::Three, suit: Clubs    },
-                Card { rank: Rank::Four , suit: Hearts   },
-                Card { rank: Rank::Eight, suit: Diamonds },
-                Card { rank: Rank::Eight, suit: Diamonds },
-                Card { rank: Rank::Eight, suit: Clubs    },
-                Card { rank: Rank::Ace  , suit: Wild     },
-                Card { rank: Rank::Ace  , suit: Diamonds },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::Pair => 1,
-            PokerHand::TwoPair => 1,
-            PokerHand::ThreeOfAKind => 1,
-            PokerHand::Flush => 1,
-            PokerHand::Straight => 1,
-            PokerHand::FullHouse => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-    #[test]
-    fn it_evaluates_hand_correctly_3() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Clubs    },
-                Card { rank: Rank::Five , suit: Clubs    },
-                Card { rank: Rank::Three, suit: Clubs    },
-                Card { rank: Rank::Four , suit: Clubs    },
-                Card { rank: Rank::Four , suit: Hearts   },
-                Card { rank: Rank::Ace  , suit: Diamonds },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::Pair => 1,
-            PokerHand::Straight => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-    #[test]
-    fn it_evaluates_hand_correctly_4() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Clubs    },
-                Card { rank: Rank::Five , suit: Diamonds },
-                Card { rank: Rank::Three, suit: Diamonds },
-                Card { rank: Rank::Four , suit: Diamonds },
-                Card { rank: Rank::Ace  , suit: Diamonds },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::Straight => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-    #[test]
-    fn it_evaluates_5_wild_flush_five() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Two  , suit: Wild    },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::FlushFive => 1,
-            PokerHand::FourOfAKind => 1,
-            PokerHand::ThreeOfAKind => 1,
-            PokerHand::Pair => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-    #[test]
-    fn it_evalutes_flush_house() {
-        let cards: Vec<Card>;
-
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Two  , suit: Wild    },
-                Card { rank: Rank::Three  , suit: Clubs    },
-                Card { rank: Rank::Three  , suit: Wild    },
-                Card { rank: Rank::Three  , suit: Wild    },
-                Card { rank: Rank::Ace  , suit: Clubs    },
-            ];
-        }
-
-        let expected: HashMap<PokerHand, u32> = hash_map! {
-            PokerHand::FlushHouse => 1,
-            PokerHand::ThreeOfAKind => 1,
-            PokerHand::TwoPair => 1,
-            PokerHand::Pair => 1,
-            PokerHand::FullHouse => 1,
-            PokerHand::Flush => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-
-    #[test]
-    fn test_simple_flush() {
-        let cards: Vec<Card>;
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Two, suit: Hearts },
-                Card { rank: Rank::Three, suit: Hearts },
-                Card { rank: Rank::Five, suit: Hearts },
-                Card { rank: Rank::Seven, suit: Hearts },
-                Card { rank: Rank::Nine, suit: Hearts },
-            ];
-        }
-        let expected = hash_map! {
-            PokerHand::Flush => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-
-    #[test]
-    fn test_simple_straight() {
-        let cards: Vec<Card>;
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Ten, suit: Clubs },
-                Card { rank: Rank::Jack, suit: Diamonds },
-                Card { rank: Rank::Queen, suit: Hearts },
-                Card { rank: Rank::King, suit: Spades },
-                Card { rank: Rank::Ace, suit: Wild }, // Acting as Ace of any suit
-            ];
-        }
-        let expected = hash_map! {
-            PokerHand::Straight => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-
-    #[test]
-    fn test_with_multiple_wild_cards_forming_straight_flush() {
-        let cards: Vec<Card>;
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Six, suit: Wild },
-                Card { rank: Rank::Seven, suit: Wild },
-                Card { rank: Rank::Eight, suit: Clubs },
-                Card { rank: Rank::Eight, suit: Clubs },
-                Card { rank: Rank::Nine, suit: Clubs },
-                Card { rank: Rank::Ten, suit: Clubs },
-            ];
-        }
-        let expected = hash_map! {
-            PokerHand::StraightFlush => 1,
-            PokerHand::Flush=>1,
-            PokerHand::Pair => 1,
-        };
-        test_hand_correctness(cards, &expected);
-    }
-
-    #[test]
-    fn test_for_natural_full_house_vs_wild_full_house() {
-        let cards: Vec<Card>;
-        #[rustfmt::skip]
-        {
-            cards = vec![
-                Card { rank: Rank::Jack, suit: Diamonds },
-                Card { rank: Rank::Jack, suit: Spades },
-                Card { rank: Rank::Jack, suit: Clubs },
-                Card { rank: Rank::Nine, suit: Hearts },
-                Card { rank: Rank::Nine, suit: Wild }, // Acting as Nine of any suit
-            ];
-        }
-        let expected = hash_map! {
-            PokerHand::FullHouse => 1,
-            PokerHand::Pair => 1,
-            PokerHand::ThreeOfAKind => 1,
-            PokerHand::TwoPair => 1,
-
-        };
-        test_hand_correctness(cards, &expected);
-    }
-}
