@@ -2,7 +2,6 @@ use core::fmt;
 use std::fmt::{Display, Formatter};
 
 use js_sys::Object;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -2,10 +2,19 @@
 use card::{Rank, Suit};
 use hand::PokerHand;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen;
-use std::{collections::HashMap, sync::Mutex};
-use wasm_bindgen::{convert::WasmAbi, prelude::*}; // For initializing statics
+use std::{collections::HashMap, sync::{Arc, Mutex}};
+use wasm_bindgen::{ prelude::*}; // For initializing statics
+
+
+// Enabling this should allow for parallelism in wasm
+// But for some reason the web workers won't work
+// so disabling for now
+// #[cfg(target_arch = "wasm32")]
+// pub use wasm_bindgen_rayon::init_thread_pool;
+
 mod card;
 mod deck;
 mod hand;
@@ -117,20 +126,61 @@ pub fn draw_trial(hand_size: u8, trials: u32) -> JsValue {
             return JsValue::NULL;
         }
     };
-    let deck_clone = deck.clone();
+    let deck_clone = Arc::new(deck.clone());
     drop(deck);
-    let mut net_result = HashMap::new();
-    for _ in 0..trials {
-        let mut hand = deck_clone.draw_hand(hand_size);
-        let result: HashMap<PokerHand, u32> = hand.evaluate_poker_hands();
-        for (&k, &v) in result.iter() {
-            let count = net_result.entry(k).or_insert(0);
-            *count += v;
-        }
-    }
+    // Use a parallel iterator to perform the trials in parallel
+    let net_result: HashMap<PokerHand, u32> = (0..trials)
+        .into_par_iter()
+        .map(|_| {
+            let mut hand = deck_clone.draw_hand(hand_size);
+            hand.evaluate_poker_hands()
+        })
+        .reduce(
+            || HashMap::new(),
+            |mut acc, res| {
+                // Combine results from each trial
+                for (&k, &v) in res.iter() {
+                    *acc.entry(k).or_insert(0) += v;
+                }
+                acc
+            },
+        );
+
     let net_result: HashMap<PokerHand, f64> = net_result
         .iter()
         .map(|(k, v)| (*k, *v as f64 / trials as f64))
         .collect();
+
     serde_wasm_bindgen::to_value(&net_result).unwrap()
+    // let net_result = (0..trials)
+    //     .into_par_iter()
+    //     .map(|_| {
+    //         let mut hand = deck_clone.draw_hand(hand_size);
+    //         let result: HashMap<PokerHand, u32> = hand.evaluate_poker_hands();
+    //         result
+    //     })
+    //     .reduce(
+    //         || HashMap::new(),
+    //         |mut acc, x| {
+    //             for (&k, &v) in x.iter() {
+    //                 let count = acc.entry(k).or_insert(0);
+    //                 *count += v;
+    //             }
+    //             acc
+    //         },
+    //     );
+    // let mut net_result = HashMap::new();
+    // for _ in 0..trials {
+    //     let mut hand = deck_clone.draw_hand(hand_size);
+    //     let result: HashMap<PokerHand, u32> = hand.evaluate_poker_hands();
+    //     for (&k, &v) in result.iter() {
+    //         let count = net_result.entry(k).or_insert(0);
+    //         *count += v;
+    //     }
+    // }
+    // let net_result: HashMap<PokerHand, f64> = net_result
+    //     .iter()
+    //     .map(|(k, v)| (*k, *v as f64 / trials as f64))
+    //     .collect();
+    // serde_wasm_bindgen::to_value(&net_result).unwrap()
 }

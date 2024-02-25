@@ -86,13 +86,11 @@ impl Hand {
         hand_with_subbed_wilds
             .cards
             .sort_by(|a, b| a.suit.cmp(&b.suit).then(a.rank.cmp(&b.rank)));
-        println!("Hand with subbed wilds: {:#?}", hand_with_subbed_wilds);
 
         for card in hand_with_subbed_wilds.cards.iter() {
             if card.suit == last_suit || (card.suit == Wild && last_suit != NONE) {
                 suit_streak += 1;
                 if card.rank == last_rank {
-                    println!("Rank streak: {:#?}, Card: {:?}", rank_streak, card);
                     rank_streak += 1;
                 }
             } else {
@@ -125,7 +123,6 @@ impl Hand {
                 }
             }
             if suit_streak >= 5 && suit_streak > curr_straight_streak && rank_streak < 5 {
-                // println!("Suit streak: {:#?}, Rank streak: {:#?}, Card: {:#?}", suit_streak, rank_streak, card);
                 hand_map.insert(PokerHand::Flush, 1);
             }
             if suit_streak >= 5 && rank_streak >= 5 {
@@ -188,7 +185,6 @@ impl Hand {
             }
             if card.suit == Wild {
                 wild_streak += 1;
-                println!("Wild streak: {:#?}, Card: {:?}", wild_streak, card);
             } else {
                 wild_streak = 0;
             }
@@ -345,10 +341,6 @@ impl Hand {
             if curr_straight_streak == 5 && effective_suit_streak < 5 {
                 // Already handled straight flushes
                 if potential_straight_suits.len() > 1 {
-                    println!(
-                        "Wild, suit: {:#?}, {:#?}, {:#?}",
-                        wild_streak, suit_streak, card
-                    );
                     hand_map.insert(PokerHand::Straight, 1);
                 }
             }
