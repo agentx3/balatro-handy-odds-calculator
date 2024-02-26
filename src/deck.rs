@@ -37,9 +37,7 @@ impl Deck {
         for card in &self.cards {
             array.push(&card.to_jsvalue());
         }
-        unsafe {
-            let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("cards"), &JsValue::from(array));
-        }
+        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("cards"), &JsValue::from(array));
 
         JsValue::from(obj)
     }
@@ -78,7 +76,6 @@ impl Deck {
             });
         }
         Ok(Deck::from(cards_vec))
-
     }
 
     pub fn reset(&mut self) {
