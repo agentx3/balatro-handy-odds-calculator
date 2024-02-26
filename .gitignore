@@ -1,0 +1,8 @@
+.direnv/
+.devenv/
+
+.local
+*.vim
+*.rs.bk
+target/
+
