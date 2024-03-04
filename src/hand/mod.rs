@@ -218,9 +218,10 @@ impl Hand {
                     // We have a pair where one is wild
                     } else if wild_streak == 1 && last_non_wild_suit != NONE {
                         have_flush_pairs.insert(last_non_wild_suit, true);
-                    } else if have_non_flush_pairs {
+                    // Handle the case of suited pairs without wilds 
+                    } else if have_non_flush_pairs && suit_streak < 2 {
                         have_non_flush_pairs_2 = true;
-                    } else {
+                    } else if suit_streak < 2{
                         have_non_flush_pairs = true;
                     }
                 }

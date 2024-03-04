@@ -404,13 +404,31 @@ fn test_natural_full_house_vs_wild_full_house() {
         Card {
             rank: Rank::Nine,
             suit: Wild,
-        }, // Acting as Hearts for Full House
+        },
     ];
     let expected = hash_map! {
         PokerHand::FullHouse => 1,
         PokerHand::Pair => 1,
         PokerHand::ThreeOfAKind => 1,
         PokerHand::TwoPair => 1,
+    };
+    test_hand_correctness(cards, &expected);
+}
+#[test]
+fn test_3_card_hand_full_house() {
+    let cards: Vec<Card>;
+    #[rustfmt::skip]
+    {
+        cards = vec![
+            Card { rank: Rank::Ten, suit: Hearts, },
+            Card { rank: Rank::Ten, suit: Hearts, },
+            Card { rank: Rank::Ten, suit: Hearts, },
+        ];
+    }
+    let expected = hash_map! {
+        PokerHand::FullHouse => 0,
+        PokerHand::Pair => 1,
+        PokerHand::ThreeOfAKind => 1,
     };
     test_hand_correctness(cards, &expected);
 }
