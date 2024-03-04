@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "balatro-calculator"
+name = "balatro-handy-odds-calculator"
 version = "0.1.0"
 dependencies = [
  "common_macros",
